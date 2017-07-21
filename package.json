@@ -1,7 +1,7 @@
 {
   "name": "adsr-gain-node",
   "version": "1.0.0",
-  "description": "A simple and small module for getting an adsr gain node",
+  "description": "A simple and small nodejs module for creating an adsr gain node",
   "main": "index.js",
   "scripts": {
     "test": "test.js"
