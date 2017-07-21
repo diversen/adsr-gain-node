@@ -1,0 +1,24 @@
+{
+  "name": "adsr-gain-node",
+  "version": "1.0.0",
+  "description": "A simple and small module for getting an adsr gain node",
+  "main": "index.js",
+  "scripts": {
+    "test": "test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diversen/adsr-gain-node.git"
+  },
+  "keywords": [
+    "audiocontext",
+    "audio",
+    "adsr"
+  ],
+  "author": "dennis iversen",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/diversen/adsr-gain-node/issues"
+  },
+  "homepage": "https://github.com/diversen/adsr-gain-node#readme"
+}
