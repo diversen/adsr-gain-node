@@ -54,9 +54,7 @@ function Gain(ctx) {
                 this.options.attackTime + this.options.sustainTime + this.options.releaseTime;
         
         setTimeout( () => {
-            // console.log(this.gainNode);
             this.gainNode.disconnect();
-            console.log(totalLength);
         },
         totalLength * 1000);
     };
