@@ -48,10 +48,13 @@ function Gain(ctx) {
         
         return this.gainNode;
     };
+
+    this.getTotalLength = function () {
+        return this.options.attackTime + this.options.sustainTime + this.options.releaseTime
+    }
     
     this.disconnect = function() {
-        var totalLength = 
-                this.options.attackTime + this.options.sustainTime + this.options.releaseTime;
+        var totalLength = this.getTotalLength();
         
         setTimeout( () => {
             this.gainNode.disconnect();
