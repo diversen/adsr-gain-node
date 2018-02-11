@@ -20,15 +20,12 @@ function Gain(ctx) {
     };
 
     this.gainNode;
-    /**
-     * The gainNode
-     * @param {float} begin ctx time
-     * @returns {Gain.getGainNode.gainNode}
-     */
+    
+    // Get gain node
     this.getGainNode = function (begin) {
 
         this.gainNode = this.ctx.createGain();
-        this.gainNode.gain.value = this.options.initGain;
+        this.gainNode.gain.setTargetAtTime(this.options.initGain, begin, 0)
 
         // Attack to max
         this.gainNode.gain.setTargetAtTime(
