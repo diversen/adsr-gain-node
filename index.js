@@ -1,63 +1,64 @@
-function Gain(ctx) {
+function AdsrGainNode(ctx) {
 
     this.ctx = ctx;
 
-    this.secondsToTimeConstant = function (sec) {
-        return (sec * 2) / 8;
-    };
-
     this.options = {
-        initGain: 0.1, // Init gain on note
-        maxGain: 1.0, // Max gain on note
-        attackTime: 0.1, // AttackTime. gain.init to gain.max in attackTime
-        sustainTime: 1, // Sustain note in time
-        releaseTime: 1, // Approximated end time. Calculated with secondsToTimeConstant()
-        // disconnect: false // Should we autodisconnect. Default is true
+        attackAmp: 0.1, 
+        decayAmp: 0.3,
+        sustainAmp: 0.7,
+        releaseAmp: 0.01,
+        attackTime: 0.1,
+        decayTime: 0.2,
+        sustainTime: 1.0, 
+        releaseTime: 3.4
     };
 
     this.setOptions = function (options) {
         this.options = options;
     };
 
-    this.gainNode;
+    this.gainNode
     
     // Get gain node
     this.getGainNode = function (begin) {
 
         this.gainNode = this.ctx.createGain();
-        this.gainNode.gain.setTargetAtTime(this.options.initGain, begin, 0)
 
-        // Attack to max
-        this.gainNode.gain.setTargetAtTime(
-                this.options.maxGain,
-                begin + this.options.attackTime,
-                this.options.attackTime);
-
-        // Sustain and end note
-        this.gainNode.gain.setTargetAtTime(
-                0.0,
-                begin + this.options.attackTime + this.options.sustainTime,
-                this.secondsToTimeConstant(this.options.releaseTime));
+        this.gainNode.gain.setValueAtTime(0, begin)
         
-        if (this.options.disconnect !== false) {
-            this.disconnect(begin);
-        }
+        // Attack
+        this.gainNode.gain.exponentialRampToValueAtTime(
+            this.options.attackAmp, 
+            begin + this.options.attackTime)
+
+        // Decay
+        this.gainNode.gain.exponentialRampToValueAtTime(
+            this.options.decayAmp, 
+            begin + this.options.attackTime + this.options.decayTime)
+
+        // Sustain
+        this.gainNode.gain.exponentialRampToValueAtTime(
+            this.options.sustainAmp, 
+            begin + this.options.attackTime + this.options.sustainTime)
+
+        // Release
+        this.gainNode.gain.exponentialRampToValueAtTime(
+            this.options.releaseAmp,
+            begin + this.options.attackTime + this.options.decayTime + this.options.sustainTime + this.options.releaseTime)
         
         return this.gainNode;
     };
 
-    this.getTotalLength = function () {
-        return this.options.attackTime + this.options.sustainTime + this.options.releaseTime
+    this.getTotalTime = function () {
+        return this.options.attackTime + this.options.decayTime + this.options.sustainTime + this.options.releaseTime
     }
     
-    this.disconnect = function() {
-        var totalLength = this.getTotalLength();
-        
+    this.disconnect = () => {
         setTimeout( () => {
             this.gainNode.disconnect();
         },
-        totalLength * 1000);
+        this.getTotalTime() * 1000);
     };
 }
 
-module.exports = Gain;
+module.exports = AdsrGainNode;

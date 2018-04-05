@@ -1,25 +1,3 @@
-<script src="dist/adsr-gain-node.js"></script>
-<script>
-var ctx = new AudioContext();
-
-var oscillator = ctx.createOscillator();
-
-var g = new adsrGainNode(ctx);
-g.setOptions({
-    initGain: 0.1, // Init gain on note
-    maxGain: 0.5, // Max gain on note
-    attackTime: 0.8, // AttackTime. gain.init to gain.max in attackTime
-    sustainTime: 1, // Sustain note in time
-    releaseTime: 1 // Approximated end time. Calculated with secondsToTimeConstant()
-});
+<script src="bundle.js"></script>
 
 
-var triggerTime = 0;
-var gainNode = g.getGainNode(triggerTime);
-
-oscillator.connect(gainNode);
-
-gainNode.connect(ctx.destination);
-oscillator.start();
-
-</script>
