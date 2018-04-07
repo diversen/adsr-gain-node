@@ -56,10 +56,11 @@ function AdsrGainNode(ctx) {
         if (this.options.autoRelease) {
             this.gainNode.gain.exponentialRampToValueAtTime(
                 this.options.releaseAmp,
-                this.audioTime + this.options.attackTime + this.options.decayTime + this.options.sustainTime + this.options.releaseTime)
+                audioTime + this.releaseTime()
+            )
             
             // Disconnect the gain node 
-            this.disconnect(this.options.attackTime + this.options.decayTime + this.options.sustainTime + this.options.releaseTime)
+            this.disconnect(audioTime + this.releaseTime())
         }
         return this.gainNode;
     };
@@ -72,15 +73,22 @@ function AdsrGainNode(ctx) {
     this.releaseNow = () => {
         this.gainNode.gain.exponentialRampToValueAtTime(
             this.options.releaseAmp,
-            this.releaseTime()) 
+            this.ctx.currentTime + this.options.releaseTime) 
         this.disconnect(this.options.releaseTime)
     }
 
     /**
-     * Get release time according to audio ctx time and the adsr release time
+     * Get release time according to the adsr release time
      */
     this.releaseTime = function() {
-        return this.ctx.currentTime + this.options.releaseTime
+        return this.options.attackTime + this.options.decayTime + this.options.sustainTime + this.options.releaseTime
+    }
+
+    /**
+     * Get release time according to 'now'
+     */
+    this.releaseTimeNow = function () {
+        return this.ctx.currentTime + this.releaseTime()
     }
     
     /**
