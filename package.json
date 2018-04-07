@@ -13,6 +13,8 @@
   "keywords": [
     "audiocontext",
     "audio",
+		"web-audio",
+		"adsr-envelope",
     "adsr"
   ],
   "author": "dennis iversen",
