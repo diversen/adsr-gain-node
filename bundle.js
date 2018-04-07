@@ -11,54 +11,88 @@ function AdsrGainNode(ctx) {
         attackTime: 0.1,
         decayTime: 0.2,
         sustainTime: 1.0, 
-        releaseTime: 3.4
+        releaseTime: 3.4,
+        autoRelease: true
     };
 
+    /**
+     * Set options or use defaults
+     * @param {object} options 
+     */
     this.setOptions = function (options) {
-        this.options = options;
+        this.options = Object.assign(this.options, options);
     };
 
     this.gainNode
+    this.audioTime
     
-    // Get gain node
-    this.getGainNode = function (begin) {
+    /**
+     * Get a gain node from defined options
+     * @param {float} audioTime an audio context time stamp
+     */
+    this.getGainNode =  (audioTime) => {
 
         this.gainNode = this.ctx.createGain();
+        this.audioTime = audioTime
 
-        this.gainNode.gain.setValueAtTime(0, begin)
+        this.gainNode.gain.setValueAtTime(0, audioTime)        
         
         // Attack
         this.gainNode.gain.exponentialRampToValueAtTime(
             this.options.attackAmp, 
-            begin + this.options.attackTime)
+            audioTime + this.options.attackTime)
 
         // Decay
         this.gainNode.gain.exponentialRampToValueAtTime(
             this.options.decayAmp, 
-            begin + this.options.attackTime + this.options.decayTime)
+            audioTime + this.options.attackTime + this.options.decayTime)
 
         // Sustain
         this.gainNode.gain.exponentialRampToValueAtTime(
             this.options.sustainAmp, 
-            begin + this.options.attackTime + this.options.sustainTime)
+            audioTime + this.options.attackTime + this.options.sustainTime)
 
-        // Release
-        this.gainNode.gain.exponentialRampToValueAtTime(
-            this.options.releaseAmp,
-            begin + this.options.attackTime + this.options.decayTime + this.options.sustainTime + this.options.releaseTime)
-        
+        // Check if auto-release
+        // Then calculate when note should stop
+        if (this.options.autoRelease) {
+            this.gainNode.gain.exponentialRampToValueAtTime(
+                this.options.releaseAmp,
+                this.audioTime + this.options.attackTime + this.options.decayTime + this.options.sustainTime + this.options.releaseTime)
+            
+            // Disconnect the gain node 
+            this.disconnect(this.options.attackTime + this.options.decayTime + this.options.sustainTime + this.options.releaseTime)
+        }
         return this.gainNode;
     };
 
-    this.getTotalTime = function () {
-        return this.options.attackTime + this.options.decayTime + this.options.sustainTime + this.options.releaseTime
+    /**
+     * Release the note dynamicaly
+     * E.g. if your are making a keyboard, and you want the note
+     * to be released according to current audio time added the ADSR release time 
+     */
+    this.releaseNow = () => {
+        this.gainNode.gain.exponentialRampToValueAtTime(
+            this.options.releaseAmp,
+            this.releaseTime()) 
+        this.disconnect(this.options.releaseTime)
+    }
+
+    /**
+     * Get release time according to audio ctx time and the adsr release time
+     */
+    this.releaseTime = function() {
+        return this.ctx.currentTime + this.options.releaseTime
     }
     
-    this.disconnect = () => {
+    /**
+     * 
+     * @param {float} disconnectTime the time when gainNode should disconnect 
+     */
+    this.disconnect = (disconnectTime) => {
         setTimeout( () => {
             this.gainNode.disconnect();
         },
-        this.getTotalTime() * 1000);
+        disconnectTime * 1000);
     };
 }
 
@@ -73,33 +107,54 @@ var oscillator = audioCtx.createOscillator();
 
 // Helper function to get new gain node
 function getADSR () {
-    var gain = new adsrGainNode(audioCtx);
-    gain.setOptions({
-            attackAmp: 0.1, 
-            decayAmp: 0.3,
-            sustainAmp: 0.7,
-            releaseAmp: 0.01,
-            attackTime: 0.1,
-            decayTime: 0.2,
-            sustainTime: 1.0, 
-            releaseTime: 3.4
+    let adsr = new adsrGainNode(audioCtx);
+    adsr.setOptions({
+        attackAmp: 0.001, 
+        decayAmp: 0.3,
+        sustainAmp: 0.7,
+        releaseAmp: 0.001,
+        attackTime: 0.1,
+        decayTime: 0.2,
+        sustainTime: 1.0, 
+        releaseTime: 5.0,
+
+        /**
+         * If we are making e.g. a keyboard, then we may 
+         * not auto-release the note. If auto release is false then
+         * we should release the note using. 
+         * `adsr.releaseNow()´
+         */
+        autoRelease: true
     });
-    return gain
+    return adsr
 }
 
-// Begin time for gain
-var begin = audioCtx.currentTime + 1
 
+
+// Begin time for gain
+var begin = audioCtx.currentTime
+
+// Get adsr and the gain node
 var adsr = getADSR()
 var gainNode = adsr.getGainNode(begin);
 
+// Connect the oscillator to the gain node
 oscillator.connect(gainNode);
 gainNode.connect(audioCtx.destination);
 
+// Start
 oscillator.start(begin);
 
-// Stop oscillator when adsr has stopped
-oscillator.stop(begin + adsr.getTotalTime())
+// Stop oscillator according to the ADSR
+oscillator.stop(adsr.releaseTime())
+
+// On a piano may want to release the note, when
+// the key is released. 
+// 
+// Then we may do something like this to end the note and the gain node: 
+// E.g onKeyUp: 
+//     oscillator.stop(adsr.releaseTime());
+//     adsr.releaseNow()
 
 },{"./index":1}]},{},[2])
-//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi4uLy4uLy4uL3Vzci9sb2NhbC9saWIvbm9kZV9tb2R1bGVzL3dhdGNoaWZ5L25vZGVfbW9kdWxlcy9icm93c2VyLXBhY2svX3ByZWx1ZGUuanMiLCJpbmRleC5qcyIsInRlc3QuanMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBQUE7QUNBQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQ2hFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EiLCJmaWxlIjoiZ2VuZXJhdGVkLmpzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXNDb250ZW50IjpbIihmdW5jdGlvbiBlKHQsbixyKXtmdW5jdGlvbiBzKG8sdSl7aWYoIW5bb10pe2lmKCF0W29dKXt2YXIgYT10eXBlb2YgcmVxdWlyZT09XCJmdW5jdGlvblwiJiZyZXF1aXJlO2lmKCF1JiZhKXJldHVybiBhKG8sITApO2lmKGkpcmV0dXJuIGkobywhMCk7dmFyIGY9bmV3IEVycm9yKFwiQ2Fubm90IGZpbmQgbW9kdWxlICdcIitvK1wiJ1wiKTt0aHJvdyBmLmNvZGU9XCJNT0RVTEVfTk9UX0ZPVU5EXCIsZn12YXIgbD1uW29dPXtleHBvcnRzOnt9fTt0W29dWzBdLmNhbGwobC5leHBvcnRzLGZ1bmN0aW9uKGUpe3ZhciBuPXRbb11bMV1bZV07cmV0dXJuIHMobj9uOmUpfSxsLGwuZXhwb3J0cyxlLHQsbixyKX1yZXR1cm4gbltvXS5leHBvcnRzfXZhciBpPXR5cGVvZiByZXF1aXJlPT1cImZ1bmN0aW9uXCImJnJlcXVpcmU7Zm9yKHZhciBvPTA7bzxyLmxlbmd0aDtvKyspcyhyW29dKTtyZXR1cm4gc30pIiwiZnVuY3Rpb24gQWRzckdhaW5Ob2RlKGN0eCkge1xuXG4gICAgdGhpcy5jdHggPSBjdHg7XG5cbiAgICB0aGlzLm9wdGlvbnMgPSB7XG4gICAgICAgIGF0dGFja0FtcDogMC4xLCBcbiAgICAgICAgZGVjYXlBbXA6IDAuMyxcbiAgICAgICAgc3VzdGFpbkFtcDogMC43LFxuICAgICAgICByZWxlYXNlQW1wOiAwLjAxLFxuICAgICAgICBhdHRhY2tUaW1lOiAwLjEsXG4gICAgICAgIGRlY2F5VGltZTogMC4yLFxuICAgICAgICBzdXN0YWluVGltZTogMS4wLCBcbiAgICAgICAgcmVsZWFzZVRpbWU6IDMuNFxuICAgIH07XG5cbiAgICB0aGlzLnNldE9wdGlvbnMgPSBmdW5jdGlvbiAob3B0aW9ucykge1xuICAgICAgICB0aGlzLm9wdGlvbnMgPSBvcHRpb25zO1xuICAgIH07XG5cbiAgICB0aGlzLmdhaW5Ob2RlXG4gICAgXG4gICAgLy8gR2V0IGdhaW4gbm9kZVxuICAgIHRoaXMuZ2V0R2Fpbk5vZGUgPSBmdW5jdGlvbiAoYmVnaW4pIHtcblxuICAgICAgICB0aGlzLmdhaW5Ob2RlID0gdGhpcy5jdHguY3JlYXRlR2FpbigpO1xuXG4gICAgICAgIHRoaXMuZ2Fpbk5vZGUuZ2Fpbi5zZXRWYWx1ZUF0VGltZSgwLCBiZWdpbilcbiAgICAgICAgXG4gICAgICAgIC8vIEF0dGFja1xuICAgICAgICB0aGlzLmdhaW5Ob2RlLmdhaW4uZXhwb25lbnRpYWxSYW1wVG9WYWx1ZUF0VGltZShcbiAgICAgICAgICAgIHRoaXMub3B0aW9ucy5hdHRhY2tBbXAsIFxuICAgICAgICAgICAgYmVnaW4gKyB0aGlzLm9wdGlvbnMuYXR0YWNrVGltZSlcblxuICAgICAgICAvLyBEZWNheVxuICAgICAgICB0aGlzLmdhaW5Ob2RlLmdhaW4uZXhwb25lbnRpYWxSYW1wVG9WYWx1ZUF0VGltZShcbiAgICAgICAgICAgIHRoaXMub3B0aW9ucy5kZWNheUFtcCwgXG4gICAgICAgICAgICBiZWdpbiArIHRoaXMub3B0aW9ucy5hdHRhY2tUaW1lICsgdGhpcy5vcHRpb25zLmRlY2F5VGltZSlcblxuICAgICAgICAvLyBTdXN0YWluXG4gICAgICAgIHRoaXMuZ2Fpbk5vZGUuZ2Fpbi5leHBvbmVudGlhbFJhbXBUb1ZhbHVlQXRUaW1lKFxuICAgICAgICAgICAgdGhpcy5vcHRpb25zLnN1c3RhaW5BbXAsIFxuICAgICAgICAgICAgYmVnaW4gKyB0aGlzLm9wdGlvbnMuYXR0YWNrVGltZSArIHRoaXMub3B0aW9ucy5zdXN0YWluVGltZSlcblxuICAgICAgICAvLyBSZWxlYXNlXG4gICAgICAgIHRoaXMuZ2Fpbk5vZGUuZ2Fpbi5leHBvbmVudGlhbFJhbXBUb1ZhbHVlQXRUaW1lKFxuICAgICAgICAgICAgdGhpcy5vcHRpb25zLnJlbGVhc2VBbXAsXG4gICAgICAgICAgICBiZWdpbiArIHRoaXMub3B0aW9ucy5hdHRhY2tUaW1lICsgdGhpcy5vcHRpb25zLmRlY2F5VGltZSArIHRoaXMub3B0aW9ucy5zdXN0YWluVGltZSArIHRoaXMub3B0aW9ucy5yZWxlYXNlVGltZSlcbiAgICAgICAgXG4gICAgICAgIHJldHVybiB0aGlzLmdhaW5Ob2RlO1xuICAgIH07XG5cbiAgICB0aGlzLmdldFRvdGFsVGltZSA9IGZ1bmN0aW9uICgpIHtcbiAgICAgICAgcmV0dXJuIHRoaXMub3B0aW9ucy5hdHRhY2tUaW1lICsgdGhpcy5vcHRpb25zLmRlY2F5VGltZSArIHRoaXMub3B0aW9ucy5zdXN0YWluVGltZSArIHRoaXMub3B0aW9ucy5yZWxlYXNlVGltZVxuICAgIH1cbiAgICBcbiAgICB0aGlzLmRpc2Nvbm5lY3QgPSAoKSA9PiB7XG4gICAgICAgIHNldFRpbWVvdXQoICgpID0+IHtcbiAgICAgICAgICAgIHRoaXMuZ2Fpbk5vZGUuZGlzY29ubmVjdCgpO1xuICAgICAgICB9LFxuICAgICAgICB0aGlzLmdldFRvdGFsVGltZSgpICogMTAwMCk7XG4gICAgfTtcbn1cblxubW9kdWxlLmV4cG9ydHMgPSBBZHNyR2Fpbk5vZGU7XG4iLCJ2YXIgYWRzckdhaW5Ob2RlID0gcmVxdWlyZSgnLi9pbmRleCcpXG5cbnZhciBhdWRpb0N0eCA9IG5ldyBBdWRpb0NvbnRleHQoKTtcblxudmFyIG9zY2lsbGF0b3IgPSBhdWRpb0N0eC5jcmVhdGVPc2NpbGxhdG9yKCk7XG5cbi8vIEhlbHBlciBmdW5jdGlvbiB0byBnZXQgbmV3IGdhaW4gbm9kZVxuZnVuY3Rpb24gZ2V0QURTUiAoKSB7XG4gICAgdmFyIGdhaW4gPSBuZXcgYWRzckdhaW5Ob2RlKGF1ZGlvQ3R4KTtcbiAgICBnYWluLnNldE9wdGlvbnMoe1xuICAgICAgICAgICAgYXR0YWNrQW1wOiAwLjEsIFxuICAgICAgICAgICAgZGVjYXlBbXA6IDAuMyxcbiAgICAgICAgICAgIHN1c3RhaW5BbXA6IDAuNyxcbiAgICAgICAgICAgIHJlbGVhc2VBbXA6IDAuMDEsXG4gICAgICAgICAgICBhdHRhY2tUaW1lOiAwLjEsXG4gICAgICAgICAgICBkZWNheVRpbWU6IDAuMixcbiAgICAgICAgICAgIHN1c3RhaW5UaW1lOiAxLjAsIFxuICAgICAgICAgICAgcmVsZWFzZVRpbWU6IDMuNFxuICAgIH0pO1xuICAgIHJldHVybiBnYWluXG59XG5cbi8vIEJlZ2luIHRpbWUgZm9yIGdhaW5cbnZhciBiZWdpbiA9IGF1ZGlvQ3R4LmN1cnJlbnRUaW1lICsgMVxuXG52YXIgYWRzciA9IGdldEFEU1IoKVxudmFyIGdhaW5Ob2RlID0gYWRzci5nZXRHYWluTm9kZShiZWdpbik7XG5cbm9zY2lsbGF0b3IuY29ubmVjdChnYWluTm9kZSk7XG5nYWluTm9kZS5jb25uZWN0KGF1ZGlvQ3R4LmRlc3RpbmF0aW9uKTtcblxub3NjaWxsYXRvci5zdGFydChiZWdpbik7XG5cbi8vIFN0b3Agb3NjaWxsYXRvciB3aGVuIGFkc3IgaGFzIHN0b3BwZWRcbm9zY2lsbGF0b3Iuc3RvcChiZWdpbiArIGFkc3IuZ2V0VG90YWxUaW1lKCkpXG4iXX0=
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi4uLy4uLy4uLy4uLy4uL3Vzci9sb2NhbC9saWIvbm9kZV9tb2R1bGVzL3dhdGNoaWZ5L25vZGVfbW9kdWxlcy9icm93c2VyLXBhY2svX3ByZWx1ZGUuanMiLCJpbmRleC5qcyIsInRlc3QuanMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBQUE7QUNBQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FDbEdBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQSIsImZpbGUiOiJnZW5lcmF0ZWQuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlc0NvbnRlbnQiOlsiKGZ1bmN0aW9uIGUodCxuLHIpe2Z1bmN0aW9uIHMobyx1KXtpZighbltvXSl7aWYoIXRbb10pe3ZhciBhPXR5cGVvZiByZXF1aXJlPT1cImZ1bmN0aW9uXCImJnJlcXVpcmU7aWYoIXUmJmEpcmV0dXJuIGEobywhMCk7aWYoaSlyZXR1cm4gaShvLCEwKTt2YXIgZj1uZXcgRXJyb3IoXCJDYW5ub3QgZmluZCBtb2R1bGUgJ1wiK28rXCInXCIpO3Rocm93IGYuY29kZT1cIk1PRFVMRV9OT1RfRk9VTkRcIixmfXZhciBsPW5bb109e2V4cG9ydHM6e319O3Rbb11bMF0uY2FsbChsLmV4cG9ydHMsZnVuY3Rpb24oZSl7dmFyIG49dFtvXVsxXVtlXTtyZXR1cm4gcyhuP246ZSl9LGwsbC5leHBvcnRzLGUsdCxuLHIpfXJldHVybiBuW29dLmV4cG9ydHN9dmFyIGk9dHlwZW9mIHJlcXVpcmU9PVwiZnVuY3Rpb25cIiYmcmVxdWlyZTtmb3IodmFyIG89MDtvPHIubGVuZ3RoO28rKylzKHJbb10pO3JldHVybiBzfSkiLCJmdW5jdGlvbiBBZHNyR2Fpbk5vZGUoY3R4KSB7XG5cbiAgICB0aGlzLmN0eCA9IGN0eDtcblxuICAgIHRoaXMub3B0aW9ucyA9IHtcbiAgICAgICAgYXR0YWNrQW1wOiAwLjEsIFxuICAgICAgICBkZWNheUFtcDogMC4zLFxuICAgICAgICBzdXN0YWluQW1wOiAwLjcsXG4gICAgICAgIHJlbGVhc2VBbXA6IDAuMDEsXG4gICAgICAgIGF0dGFja1RpbWU6IDAuMSxcbiAgICAgICAgZGVjYXlUaW1lOiAwLjIsXG4gICAgICAgIHN1c3RhaW5UaW1lOiAxLjAsIFxuICAgICAgICByZWxlYXNlVGltZTogMy40LFxuICAgICAgICBhdXRvUmVsZWFzZTogdHJ1ZVxuICAgIH07XG5cbiAgICAvKipcbiAgICAgKiBTZXQgb3B0aW9ucyBvciB1c2UgZGVmYXVsdHNcbiAgICAgKiBAcGFyYW0ge29iamVjdH0gb3B0aW9ucyBcbiAgICAgKi9cbiAgICB0aGlzLnNldE9wdGlvbnMgPSBmdW5jdGlvbiAob3B0aW9ucykge1xuICAgICAgICB0aGlzLm9wdGlvbnMgPSBPYmplY3QuYXNzaWduKHRoaXMub3B0aW9ucywgb3B0aW9ucyk7XG4gICAgfTtcblxuICAgIHRoaXMuZ2Fpbk5vZGVcbiAgICB0aGlzLmF1ZGlvVGltZVxuICAgIFxuICAgIC8qKlxuICAgICAqIEdldCBhIGdhaW4gbm9kZSBmcm9tIGRlZmluZWQgb3B0aW9uc1xuICAgICAqIEBwYXJhbSB7ZmxvYXR9IGF1ZGlvVGltZSBhbiBhdWRpbyBjb250ZXh0IHRpbWUgc3RhbXBcbiAgICAgKi9cbiAgICB0aGlzLmdldEdhaW5Ob2RlID0gIChhdWRpb1RpbWUpID0+IHtcblxuICAgICAgICB0aGlzLmdhaW5Ob2RlID0gdGhpcy5jdHguY3JlYXRlR2FpbigpO1xuICAgICAgICB0aGlzLmF1ZGlvVGltZSA9IGF1ZGlvVGltZVxuXG4gICAgICAgIHRoaXMuZ2Fpbk5vZGUuZ2Fpbi5zZXRWYWx1ZUF0VGltZSgwLCBhdWRpb1RpbWUpICAgICAgICBcbiAgICAgICAgXG4gICAgICAgIC8vIEF0dGFja1xuICAgICAgICB0aGlzLmdhaW5Ob2RlLmdhaW4uZXhwb25lbnRpYWxSYW1wVG9WYWx1ZUF0VGltZShcbiAgICAgICAgICAgIHRoaXMub3B0aW9ucy5hdHRhY2tBbXAsIFxuICAgICAgICAgICAgYXVkaW9UaW1lICsgdGhpcy5vcHRpb25zLmF0dGFja1RpbWUpXG5cbiAgICAgICAgLy8gRGVjYXlcbiAgICAgICAgdGhpcy5nYWluTm9kZS5nYWluLmV4cG9uZW50aWFsUmFtcFRvVmFsdWVBdFRpbWUoXG4gICAgICAgICAgICB0aGlzLm9wdGlvbnMuZGVjYXlBbXAsIFxuICAgICAgICAgICAgYXVkaW9UaW1lICsgdGhpcy5vcHRpb25zLmF0dGFja1RpbWUgKyB0aGlzLm9wdGlvbnMuZGVjYXlUaW1lKVxuXG4gICAgICAgIC8vIFN1c3RhaW5cbiAgICAgICAgdGhpcy5nYWluTm9kZS5nYWluLmV4cG9uZW50aWFsUmFtcFRvVmFsdWVBdFRpbWUoXG4gICAgICAgICAgICB0aGlzLm9wdGlvbnMuc3VzdGFpbkFtcCwgXG4gICAgICAgICAgICBhdWRpb1RpbWUgKyB0aGlzLm9wdGlvbnMuYXR0YWNrVGltZSArIHRoaXMub3B0aW9ucy5zdXN0YWluVGltZSlcblxuICAgICAgICAvLyBDaGVjayBpZiBhdXRvLXJlbGVhc2VcbiAgICAgICAgLy8gVGhlbiBjYWxjdWxhdGUgd2hlbiBub3RlIHNob3VsZCBzdG9wXG4gICAgICAgIGlmICh0aGlzLm9wdGlvbnMuYXV0b1JlbGVhc2UpIHtcbiAgICAgICAgICAgIHRoaXMuZ2Fpbk5vZGUuZ2Fpbi5leHBvbmVudGlhbFJhbXBUb1ZhbHVlQXRUaW1lKFxuICAgICAgICAgICAgICAgIHRoaXMub3B0aW9ucy5yZWxlYXNlQW1wLFxuICAgICAgICAgICAgICAgIHRoaXMuYXVkaW9UaW1lICsgdGhpcy5vcHRpb25zLmF0dGFja1RpbWUgKyB0aGlzLm9wdGlvbnMuZGVjYXlUaW1lICsgdGhpcy5vcHRpb25zLnN1c3RhaW5UaW1lICsgdGhpcy5vcHRpb25zLnJlbGVhc2VUaW1lKVxuICAgICAgICAgICAgXG4gICAgICAgICAgICAvLyBEaXNjb25uZWN0IHRoZSBnYWluIG5vZGUgXG4gICAgICAgICAgICB0aGlzLmRpc2Nvbm5lY3QodGhpcy5vcHRpb25zLmF0dGFja1RpbWUgKyB0aGlzLm9wdGlvbnMuZGVjYXlUaW1lICsgdGhpcy5vcHRpb25zLnN1c3RhaW5UaW1lICsgdGhpcy5vcHRpb25zLnJlbGVhc2VUaW1lKVxuICAgICAgICB9XG4gICAgICAgIHJldHVybiB0aGlzLmdhaW5Ob2RlO1xuICAgIH07XG5cbiAgICAvKipcbiAgICAgKiBSZWxlYXNlIHRoZSBub3RlIGR5bmFtaWNhbHlcbiAgICAgKiBFLmcuIGlmIHlvdXIgYXJlIG1ha2luZyBhIGtleWJvYXJkLCBhbmQgeW91IHdhbnQgdGhlIG5vdGVcbiAgICAgKiB0byBiZSByZWxlYXNlZCBhY2NvcmRpbmcgdG8gY3VycmVudCBhdWRpbyB0aW1lIGFkZGVkIHRoZSBBRFNSIHJlbGVhc2UgdGltZSBcbiAgICAgKi9cbiAgICB0aGlzLnJlbGVhc2VOb3cgPSAoKSA9PiB7XG4gICAgICAgIHRoaXMuZ2Fpbk5vZGUuZ2Fpbi5leHBvbmVudGlhbFJhbXBUb1ZhbHVlQXRUaW1lKFxuICAgICAgICAgICAgdGhpcy5vcHRpb25zLnJlbGVhc2VBbXAsXG4gICAgICAgICAgICB0aGlzLnJlbGVhc2VUaW1lKCkpIFxuICAgICAgICB0aGlzLmRpc2Nvbm5lY3QodGhpcy5vcHRpb25zLnJlbGVhc2VUaW1lKVxuICAgIH1cblxuICAgIC8qKlxuICAgICAqIEdldCByZWxlYXNlIHRpbWUgYWNjb3JkaW5nIHRvIGF1ZGlvIGN0eCB0aW1lIGFuZCB0aGUgYWRzciByZWxlYXNlIHRpbWVcbiAgICAgKi9cbiAgICB0aGlzLnJlbGVhc2VUaW1lID0gZnVuY3Rpb24oKSB7XG4gICAgICAgIHJldHVybiB0aGlzLmN0eC5jdXJyZW50VGltZSArIHRoaXMub3B0aW9ucy5yZWxlYXNlVGltZVxuICAgIH1cbiAgICBcbiAgICAvKipcbiAgICAgKiBcbiAgICAgKiBAcGFyYW0ge2Zsb2F0fSBkaXNjb25uZWN0VGltZSB0aGUgdGltZSB3aGVuIGdhaW5Ob2RlIHNob3VsZCBkaXNjb25uZWN0IFxuICAgICAqL1xuICAgIHRoaXMuZGlzY29ubmVjdCA9IChkaXNjb25uZWN0VGltZSkgPT4ge1xuICAgICAgICBzZXRUaW1lb3V0KCAoKSA9PiB7XG4gICAgICAgICAgICB0aGlzLmdhaW5Ob2RlLmRpc2Nvbm5lY3QoKTtcbiAgICAgICAgfSxcbiAgICAgICAgZGlzY29ubmVjdFRpbWUgKiAxMDAwKTtcbiAgICB9O1xufVxuXG5tb2R1bGUuZXhwb3J0cyA9IEFkc3JHYWluTm9kZTtcbiIsInZhciBhZHNyR2Fpbk5vZGUgPSByZXF1aXJlKCcuL2luZGV4JylcblxudmFyIGF1ZGlvQ3R4ID0gbmV3IEF1ZGlvQ29udGV4dCgpO1xuXG52YXIgb3NjaWxsYXRvciA9IGF1ZGlvQ3R4LmNyZWF0ZU9zY2lsbGF0b3IoKTtcblxuLy8gSGVscGVyIGZ1bmN0aW9uIHRvIGdldCBuZXcgZ2FpbiBub2RlXG5mdW5jdGlvbiBnZXRBRFNSICgpIHtcbiAgICBsZXQgYWRzciA9IG5ldyBhZHNyR2Fpbk5vZGUoYXVkaW9DdHgpO1xuICAgIGFkc3Iuc2V0T3B0aW9ucyh7XG4gICAgICAgIGF0dGFja0FtcDogMC4wMDEsIFxuICAgICAgICBkZWNheUFtcDogMC4zLFxuICAgICAgICBzdXN0YWluQW1wOiAwLjcsXG4gICAgICAgIHJlbGVhc2VBbXA6IDAuMDAxLFxuICAgICAgICBhdHRhY2tUaW1lOiAwLjEsXG4gICAgICAgIGRlY2F5VGltZTogMC4yLFxuICAgICAgICBzdXN0YWluVGltZTogMS4wLCBcbiAgICAgICAgcmVsZWFzZVRpbWU6IDUuMCxcblxuICAgICAgICAvKipcbiAgICAgICAgICogSWYgd2UgYXJlIG1ha2luZyBlLmcuIGEga2V5Ym9hcmQsIHRoZW4gd2UgbWF5IFxuICAgICAgICAgKiBub3QgYXV0by1yZWxlYXNlIHRoZSBub3RlLiBJZiBhdXRvIHJlbGVhc2UgaXMgZmFsc2UgdGhlblxuICAgICAgICAgKiB3ZSBzaG91bGQgcmVsZWFzZSB0aGUgbm90ZSB1c2luZy4gXG4gICAgICAgICAqIGBhZHNyLnJlbGVhc2VOb3coKcK0XG4gICAgICAgICAqL1xuICAgICAgICBhdXRvUmVsZWFzZTogdHJ1ZVxuICAgIH0pO1xuICAgIHJldHVybiBhZHNyXG59XG5cblxuXG4vLyBCZWdpbiB0aW1lIGZvciBnYWluXG52YXIgYmVnaW4gPSBhdWRpb0N0eC5jdXJyZW50VGltZVxuXG4vLyBHZXQgYWRzciBhbmQgdGhlIGdhaW4gbm9kZVxudmFyIGFkc3IgPSBnZXRBRFNSKClcbnZhciBnYWluTm9kZSA9IGFkc3IuZ2V0R2Fpbk5vZGUoYmVnaW4pO1xuXG4vLyBDb25uZWN0IHRoZSBvc2NpbGxhdG9yIHRvIHRoZSBnYWluIG5vZGVcbm9zY2lsbGF0b3IuY29ubmVjdChnYWluTm9kZSk7XG5nYWluTm9kZS5jb25uZWN0KGF1ZGlvQ3R4LmRlc3RpbmF0aW9uKTtcblxuLy8gU3RhcnRcbm9zY2lsbGF0b3Iuc3RhcnQoYmVnaW4pO1xuXG4vLyBTdG9wIG9zY2lsbGF0b3IgYWNjb3JkaW5nIHRvIHRoZSBBRFNSXG5vc2NpbGxhdG9yLnN0b3AoYWRzci5yZWxlYXNlVGltZSgpKVxuXG4vLyBPbiBhIHBpYW5vIG1heSB3YW50IHRvIHJlbGVhc2UgdGhlIG5vdGUsIHdoZW5cbi8vIHRoZSBrZXkgaXMgcmVsZWFzZWQuIFxuLy8gXG4vLyBUaGVuIHdlIG1heSBkbyBzb21ldGhpbmcgbGlrZSB0aGlzIHRvIGVuZCB0aGUgbm90ZSBhbmQgdGhlIGdhaW4gbm9kZTogXG4vLyBFLmcgb25LZXlVcDogXG4vLyAgICAgb3NjaWxsYXRvci5zdG9wKGFkc3IucmVsZWFzZVRpbWUoKSk7XG4vLyAgICAgYWRzci5yZWxlYXNlTm93KClcbiJdfQ==
