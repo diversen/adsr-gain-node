@@ -1,4 +1,5 @@
 var adsrGainNode = require('./index')
+var adsrForm = require('./adsrForm')
 
 var audioCtx = new AudioContext();
 
@@ -7,6 +8,9 @@ var oscillator = audioCtx.createOscillator();
 // Helper function to get new gain node
 function getADSR () {
     let adsr = new adsrGainNode(audioCtx);
+    let options = adsrForm.getFormValues()
+    adsr.setOptions(options)
+    /*
     adsr.setOptions({
         attackAmp: 0.001, 
         decayAmp: 0.3,
@@ -17,14 +21,15 @@ function getADSR () {
         sustainTime: 1.0, 
         releaseTime: 5.0,
 
-        /**
-         * If we are making e.g. a keyboard, then we may 
-         * not auto-release the note. If auto release is false then
-         * we should release the note using. 
-         * `adsr.releaseNow()´
-         */
+        
+        // If you are making e.g. a keyboard, then you may 
+        // not auto-release the note. 
+        // 
+        // If auto release is 'false' then release the note using. 
+        // `adsr.releaseNow()´
+        //
         autoRelease: true
-    });
+    });*/
     return adsr
 }
 
@@ -33,6 +38,7 @@ var nowTime = audioCtx.currentTime
 
 // Get adsr and the gain node
 // Time it to begin in current time + 5 secs
+/*
 let testTime = 2
 
 var adsr = getADSR()
@@ -48,11 +54,11 @@ oscillator.start(nowTime + testTime);
 // Stop oscillator according to the ADSR
 let endTime = adsr.releaseTime() + testTime
 oscillator.stop(endTime)
-
-// On a piano may want to release the note, when
+*/
+// On a piano you may want to release the note, when
 // the key is released. 
 // 
-// Then we may do something like this to end the note and the gain node: 
+// Then do something like this to end the note and the gain node: 
 // E.g onKeyUp: 
 //     oscillator.stop(this.adsr.releaseTimeNow())
 //     adsr.releaseNow()
@@ -60,7 +66,7 @@ oscillator.stop(endTime)
 function playNoteIn (inTime) {
 
     let adsr = getADSR()
-    let gainNode = adsr.getGainNode(nowTime + inTime );
+    let gainNode = adsr.getGainNode(audioCtx.currentTime + inTime );
 
     let oscillator = audioCtx.createOscillator();
 
@@ -69,12 +75,19 @@ function playNoteIn (inTime) {
     gainNode.connect(audioCtx.destination);
 
     // Start
-    oscillator.start(nowTime + inTime);
+    oscillator.start(audioCtx.currentTime + inTime);
 
     // Stop oscillator according to the ADSR
-    let endTime = adsr.releaseTime() + inTime
+    let endTime = adsr.releaseTime() + audioCtx.currentTime
     oscillator.stop(endTime)
 }
 
-playNoteIn(0)
-playNoteIn(4)
+document.addEventListener("DOMContentLoaded", function(event) { 
+    var elem = document.getElementById('adsr-parent')
+    adsrForm.insertHTML(elem)
+
+    var play = document.getElementById('play')
+    play.addEventListener('click', function () {
+        playNoteIn(0)
+    })
+});

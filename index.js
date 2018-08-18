@@ -34,7 +34,8 @@ function AdsrGainNode(ctx) {
         this.gainNode = this.ctx.createGain();
         this.audioTime = audioTime
 
-        this.gainNode.gain.setValueAtTime(0, audioTime)        
+        // Firefox does not like 0 -> therefor 0.0000001
+        this.gainNode.gain.setValueAtTime(0.0000001, audioTime)        
         
         // Attack
         this.gainNode.gain.exponentialRampToValueAtTime(
