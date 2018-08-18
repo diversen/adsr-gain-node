@@ -17,6 +17,12 @@ var nowTime = audioCtx.currentTime
 
 function playNoteIn (inTime) {
 
+    if(audioCtx.state === 'suspended') {
+        audioCtx.resume().then(function() {
+            console.log('Resumed')
+        });
+    }
+
     let adsr = getADSR()
     let gainNode = adsr.getGainNode(audioCtx.currentTime + inTime );
 

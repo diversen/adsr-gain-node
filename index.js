@@ -69,7 +69,7 @@ function AdsrGainNode(ctx) {
     /**
      * Release the note dynamicaly
      * E.g. if your are making a keyboard, and you want the note
-     * to be released according to current audio time added the ADSR release time 
+     * to be released according to current audio time + the ADSR release time 
      */
     this.releaseNow = () => {
         this.gainNode.gain.exponentialRampToValueAtTime(

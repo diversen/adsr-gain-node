@@ -28,9 +28,10 @@ function getADSR () {
         releaseTime: 5.0,
 
         /**
-         * If we are making e.g. a keyboard, then we may 
-         * not auto-release the note. If auto release is false then
-         * we should release the note using. 
+         * If you are making e.g. a keyboard, then you may 
+         * not auto-release the note
+         * If auto release is false then
+         * you should release the note using. 
          * `adsr.releaseNow()´
          */
         autoRelease: true
@@ -59,14 +60,21 @@ oscillator.start(nowTime + testTime);
 let endTime = adsr.releaseTime() + testTime
 oscillator.stop(endTime)
 
-// On a piano may want to release the note, when
+// On a piano you may want to release the note, when
 // the key is released. 
 // 
-// Then we may do something like this to end the note and the gain node: 
+// Then you may do something like this to end the note and the gain node: 
 // E.g onKeyUp: 
 //     oscillator.stop(this.adsr.releaseTimeNow())
 //     adsr.releaseNow()
 ~~~~
+
+There is also a HTML form which can generate a web interface for 
+the control of gain nodes. 
+
+You can see it on [https://diversen.github.io/adsr-gain-node/](https://diversen.github.io/adsr-gain-node/) 
+
+The source is [test.js](test.js)
 
 ## License
 
