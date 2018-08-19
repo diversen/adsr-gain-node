@@ -9,6 +9,7 @@ function getADSR () {
     let adsr = new adsrGainNode(audioCtx);
     let options = adsrForm.getFormValues()
     adsr.setOptions(options)
+    console.log(adsrForm.getFormValuesRaw())
     return adsr
 }
 
@@ -40,9 +41,24 @@ function playNoteIn (inTime) {
     oscillator.stop(endTime)
 }
 
+var defaultValues = {
+    attackAmp: 0.1, 
+    decayAmp: 0.3,
+    sustainAmp: 0.7,
+    releaseAmp: 0.01,
+    attackTime: 0.1,
+    decayTime: 0.2,
+    sustainTime: 1.0, 
+    releaseTime: 0.1,
+    adsrInterval: 2.1, 
+    // all above values are between 0 and 1.
+    // Except adsrInterval which are multiplied
+    // With the time constants.
+};
+
 document.addEventListener("DOMContentLoaded", function(event) { 
     var elem = document.getElementById('adsr-parent')
-    adsrForm.insertHTML(elem)
+    adsrForm.insertHTML(elem, defaultValues)
 
     var play = document.getElementById('play')
     play.addEventListener('click', function () {

@@ -54,10 +54,15 @@ var options = {
         min: 0,
         max: 1,
         step: 0.01
+    },
+    adsrInterval: {
+        value: 1
     }
 }
 
-function getAdsrFormHtml () {
+function getAdsrFormHtml (defaultValues) {
+
+    setOptionsDefaultValues(defaultValues)
 
     return `
     <form id="adsr">
@@ -65,20 +70,39 @@ function getAdsrFormHtml () {
     </form>`
 }
 
+function setOptionsDefaultValues (values) {
+    for(var i in values) {
+        options[i].value = values[i]
+    }
+
+}
+
 function getAdsrFormParts(options) {
     var str = '';
     for(var name in options) {
-        str += getAdsrFormPart(name, options[name]);
+        if (name == 'adsrInterval') {
+            str += getAdsrFormPartAdsrInterval(options);
+        } else {
+            str += getAdsrFormPart(name, options[name]);
+        }
     }
-    str += getAdsrTimeInterval();
+
     return str;
 }
 
-function getAdsrTimeInterval () {
+function getAdsrFormPartAdsrInterval (options) {
     return `
-    <span class="adsr-label">Time interval</span>
-    <input name="adsrInterval" id="adsr-interval" size="1" type="text" maxlength="2" value="10" />
-    <span> second(s)</span>
+    <div>
+        <span class="adsr-label">Time interval</span>
+        <input 
+            name="adsrInterval" 
+            id="adsr-interval" 
+            size="1" 
+            type="text" 
+            maxlength="4" 
+            value="${options.adsrInterval.value}" />
+        <span> second(s)</span>
+    </div>
     `;
 }
 
@@ -110,15 +134,25 @@ function adsrPreventSubmit () {
     });
 }
 
-
-function getFormValues () {
-    var elems = document.getElementById("adsr").elements;
-    
+function getAdsrTimeInterval () {
     var interval = document.getElementById('adsr-interval').value
     interval = parseFloat(interval)
     if (!interval) {
         interval = 1;
     }
+    return interval;
+}
+
+function getFormValuesRaw () {
+    var values = getFormValues('raw');
+    // values.timeInterval = getTimeInterval();
+    return values;
+}
+
+function getFormValues (raw) {
+    var elems = document.getElementById("adsr").elements;
+    
+    var interval = getAdsrTimeInterval();
 
     var ret = {};
     for(var i = 0; i < elems.length; i++ ) {
@@ -129,6 +163,7 @@ function getFormValues () {
         }
 
         ret[name] = value
+        if (raw) continue;
 
         if (name == 'sustainTime' || 
             name == 'releaseTime'  || 
@@ -140,8 +175,8 @@ function getFormValues () {
     return ret;
 }
 
-function insertHTML (elem) {
-    var adsrHtml = getAdsrFormHtml();
+function insertHTML (elem, defaultValues) {
+    var adsrHtml = getAdsrFormHtml(defaultValues);
     elem.insertAdjacentHTML( 'afterbegin', adsrHtml);
     adsrPreventSubmit()
 }
@@ -149,4 +184,5 @@ function insertHTML (elem) {
 
 module.exports.insertHTML = insertHTML
 module.exports.getFormValues = getFormValues
+module.exports.getFormValuesRaw = getFormValuesRaw
 
