@@ -2,6 +2,9 @@ function AdsrGainNode(ctx) {
 
     this.ctx = ctx;
 
+    this.mode = 'exponentialRampToValueAtTime';
+    // this.mode = 'linearRampToValueAtTime';
+
     this.options = {
         attackAmp: 0.1, 
         decayAmp: 0.3,
@@ -38,24 +41,24 @@ function AdsrGainNode(ctx) {
         this.gainNode.gain.setValueAtTime(0.0000001, audioTime)        
         
         // Attack
-        this.gainNode.gain.exponentialRampToValueAtTime(
+        this.gainNode.gain[this.mode](
             this.options.attackAmp, 
             audioTime + this.options.attackTime)
 
         // Decay
-        this.gainNode.gain.exponentialRampToValueAtTime(
+        this.gainNode.gain[this.mode](
             this.options.decayAmp, 
             audioTime + this.options.attackTime + this.options.decayTime)
 
         // Sustain
-        this.gainNode.gain.exponentialRampToValueAtTime(
+        this.gainNode.gain[this.mode](
             this.options.sustainAmp, 
             audioTime + this.options.attackTime + this.options.sustainTime)
-
+ 
         // Check if auto-release
         // Then calculate when note should stop
         if (this.options.autoRelease) {
-            this.gainNode.gain.exponentialRampToValueAtTime(
+            this.gainNode.gain[this.mode](
                 this.options.releaseAmp,
                 audioTime + this.releaseTime()
             )
@@ -72,7 +75,7 @@ function AdsrGainNode(ctx) {
      * to be released according to current audio time + the ADSR release time 
      */
     this.releaseNow = () => {
-        this.gainNode.gain.exponentialRampToValueAtTime(
+        this.gainNode.gain[this.mode](
             this.options.releaseAmp,
             this.ctx.currentTime + this.options.releaseTime) 
         this.disconnect(this.options.releaseTime)
